@@ -168,6 +168,25 @@ session2blog/
 
 ## 产品信息
 
-- 定价: $5 一次购买，终身更新
-- 许可证: MIT
+- 定价: 免费（MIT 开源）
 - 平台: OpenClaw Skill（需要 OpenClaw 环境）
+
+---
+
+## 🚀 Pro 版（付费，一次性 $5，终身更新）
+
+免费版只生成本地 Markdown + 平台风格适配。**Pro 版额外支持：**
+
+- ✅ **掘金一键发草稿**：`/s2b --platform juejin --publish` 直接把文章送进你的掘金草稿箱（默认草稿，审后公开，安全）
+- ✅ 两种模式：本地模型写文后发 / 先生成 .md 再发
+- ✅ 优先支持
+
+**获取 Pro：** https://jasonlizy.gumroad.com/l/session2blog-pro （把链接换成你的真实 Pro 产品 URL）
+
+> 路线图（已购用户免费更新）：微信公众号 / CSDN / 知乎发布、定时推送。
+
+## 💬 支持 / 反馈
+
+- **买了 Pro 有问题**：回复你的 Gumroad 收据邮件，或开 GitHub Issue（**请勿公开粘贴 Cookie / 账号凭证**）
+- **功能建议 / Bug**：[GitHub Issues](https://github.com/jasonleezy/session2blog/issues)
+- **免费版问题**：同上，欢迎提 Issue
