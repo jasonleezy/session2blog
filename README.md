@@ -181,7 +181,7 @@ session2blog/
 - ✅ 两种模式：本地模型写文后发 / 先生成 .md 再发
 - ✅ 优先支持
 
-**获取 Pro：** https://jasonlizy.gumroad.com/l/session2blog-pro （把链接换成你的真实 Pro 产品 URL）
+**获取 Pro：** https://jasonlizy.gumroad.com/l/session2blog-pro
 
 > 路线图（已购用户免费更新）：微信公众号 / CSDN / 知乎发布、定时推送。
 
