@@ -1,18 +1,32 @@
 ---
 name: session2blog
-description: "把 OpenClaw 会话历史一键润色成博文（技术复盘/学习笔记/排障记录），自动保存为 Markdown 文件。在会话中输入 /s2b 即可触发。"
+description: "把 OpenClaw 会话历史（含列出/选择历史会话、提取对话、自动脱敏）按模板润色成博文，保存为本地 Markdown 文件。在会话中输入 /s2b 即可触发。免费版完全本地运行，不发起任何网络请求、不处理任何平台 Cookie。"
 metadata:
   {
     "openclaw":
       {
         "emoji": "📝",
-        "requires": { "bins": ["python3"] },
+        "requires":
+          {
+            "bins": ["python3"],
+            "permissions":
+              [
+                "filesystem:read ~/.openclaw/sessions/**",
+                "filesystem:write ~/.openclaw/session2blog/articles/**",
+                "session:list",
+                "session:read",
+              ],
+          },
         "install": [],
       },
   }
 ---
 
 # Session2Blog (s2b)
+
+> **权限与数据边界（免费版）**：本 skill 仅做本地读写——读取 OpenClaw 会话文件、在本地 `~/.openclaw/session2blog/articles/` 写出 Markdown、列出/选择会话。
+> **不**发起任何网络请求，**不**读取或要求任何平台 Cookie（掘金发布等远程能力仅 Pro 版提供，且需用户主动配置 Cookie 才会发生）。
+> 生成内容默认经最佳努力脱敏（API Key / JWT / 路径），发布前请人工复核。
 
 把当前或指定的 OpenClaw 会话对话历史，按模板润色成一篇结构化博文，保存为 Markdown 文件到本地。
 

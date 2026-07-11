@@ -19,20 +19,16 @@ SESSION_ID=""
 TEMPLATE="auto"
 PLATFORM="none"
 MODE="generate"
-PUBLISH="false"
-PUBLISH_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --session) SESSION_ID="${2:-}"; shift 2 ;;
     --template) TEMPLATE="${2:-auto}"; shift 2 ;;
     --platform) PLATFORM="${2:-none}"; shift 2 ;;
-    --publish) PUBLISH="true"; shift ;;
-    --file) PUBLISH_FILE="${2:-}"; shift 2 ;;
     --list) MODE="list"; shift ;;
     -n) SESSION_NUM="${2:-}"; shift 2 ;;
     -h|--help)
-      echo "Usage: s2b [--list] [--session <id>] [--template auto|tech-review|learning-notes|troubleshooting] [--platform wechat|juejin|csdn|zhihu|none|all] [--publish] [--file <md-path>]"
+      echo "Usage: s2b [--list] [--session <id>] [--template auto|tech-review|learning-notes|troubleshooting] [--platform wechat|juejin|csdn|zhihu|none|all]"
       exit 0 ;;
     *) echo "未知参数: $1"; echo "用 s2b --help 查看用法"; exit 1 ;;
   esac
@@ -259,7 +255,7 @@ platform_label = platform_styles.get(platform_type, platform_styles["none"])
 
 dialogue_text = "\n".join(dialogue)
 
-# 构建写作指令文本（打印给会话模型，由助手写文）
+# 构建写作指令文本（供 ollama 写文 / 打印用）
 instruction_lines = []
 instruction_lines.append(f"模板: {tmpl['name']}")
 instruction_lines.append(f"标题格式: {tmpl['title_fmt']}")
@@ -288,9 +284,6 @@ instruction_lines.append("  - 敏感信息保护: 禁止出现 API Key/Token/真
 instruction_text = "\n".join(instruction_lines)
 
 # === 发布模式 ===
-    else:
-        print(f"[失败] 掘金发布出错: {resp}")
-    sys.exit(0)
 
 # === 非发布模式：打印写作指令（原行为） ===
 print("")
