@@ -150,7 +150,7 @@ YYYY-MM-DD-<模板名>-<平台>-<简短英文slug>.md
 
 ## 配置
 
-配置文件：`~/.openclaw/session2blog/config/config.yaml`
+配置文件：`~/.openclaw/session2blog/config.yaml`（安装时自动生成，权限 600）
 
 ```yaml
 default_template: auto
@@ -158,12 +158,14 @@ language: zh-CN
 author: ""
 default_platform: none      # none | wechat | juejin | csdn | zhihu | all
 articles_dir: ~/.openclaw/session2blog/articles
-cron:
-  enabled: false
-  schedule: "0 9 * * 1-5"
-  timezone: "Asia/Shanghai"
-  lookback_hours: 48
+
+# 发布平台 Cookie（Pro 版，仅本地，不随包发出）
+# 获取: 浏览器登录平台 → 开发者工具 → 复制 Cookie 整串
+# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
+juejin_cookie:
 ```
+
+> ⚠️ Cookie 等同登录态，勿分享、勿入仓库。本 skill 只在本机读取并仅发往对应平台 API。
 
 ## 文件结构
 
@@ -190,5 +192,6 @@ session2blog/
 - **优先支持**
 
 👉 获取 Pro 版：https://jasonlizy.gumroad.com/l/session2blog-pro
+👉 开源免费版（GitHub）：https://github.com/jasonleezy/session2blog
 
 （Pro 版包含本免费版的全部功能，并额外支持多平台直接发布。）
