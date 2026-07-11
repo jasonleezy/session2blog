@@ -131,29 +131,9 @@ default_platform: none      # none | wechat | juejin | csdn | zhihu | all
 language: zh-CN
 author: ""
 articles_dir: ~/.openclaw/session2blog/articles
-
-# === 发布平台 Cookie（Pro 版）===
-# 仅本地保存，不会随 skill 包发出。
-# 获取: 浏览器登录平台 → 开发者工具 → 复制 Cookie 整串
-# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
-# 当前已实现: juejin (发草稿)。微信/CSDN/知乎待后续更新。
-juejin_cookie:
 ```
 
-### 怎么填掘金 Cookie（Pro 版发布用）
-
-1. 浏览器（Safari/Chrome）登录 [juejin.cn](https://juejin.cn)
-2. 打开开发者工具（Safari: 设置→高级→勾选"开发"菜单 → 开发→显示 Web 检查器；Chrome: F12）
-3. 到 **Network（网络）** 标签 → 在掘金随便点个动作触发请求 → 点任意 `juejin.cn` 请求 → **Headers → Request Headers** → 找 `Cookie:` 那一行，复制整串
-4. 粘贴进 config：
-   ```bash
-   # 用任意编辑器打开
-   nano ~/.openclaw/session2blog/config.yaml
-   # 改成:  juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
-   ```
-5. 保存。Cookie 有时效（几天到几周），过期重新抓一次即可。
-
-> ⚠️ Cookie 等同账号登录态，请勿分享、勿贴进聊天/代码仓库。Pro 版的发布功能仅在本机读取 Cookie，并**仅在您主动执行 `--publish` 时**发往掘金 API；免费版不涉及任何远程调用。
+> 免费版无需任何 Cookie 或 API Key，完全本地闭环。掘金发布所需的 Cookie 配置仅 Pro 版涉及，见下方「Pro 版」段。
 
 ## 目录结构
 
@@ -166,7 +146,7 @@ session2blog/
 └── gumroad-product-copy.md  # 产品页文案
 
 ~/.openclaw/session2blog/   # 运行时目录（自动创建）
-├── config.yaml        # 配置文件（含 juejin_cookie 等，权限 600）
+├── config.yaml        # 配置文件（权限 600）
 ├── articles/          # 生成的博文
 └── logs/
 ```
@@ -182,7 +162,7 @@ session2blog/
 
 免费版只生成本地 Markdown + 平台风格适配。**Pro 版额外支持：**
 
-- ✅ **掘金一键发草稿**：`/s2b --platform juejin --publish` 直接把文章送进你的掘金草稿箱（默认草稿，您审过后再手动公开）
+- ✅ **掘金一键发草稿**（需 Pro 版代码）：`/s2b --platform juejin --publish` 直接把文章送进你的掘金草稿箱（默认草稿，您审过后再手动公开）
 - ✅ 两种模式：本地模型写文后发 / 先生成 .md 再发
 - ✅ 优先支持
 
