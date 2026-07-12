@@ -6,13 +6,24 @@ metadata:
     "openclaw":
       {
         "emoji": "📝",
-        "requires": { "bins": ["python3"] },
+        "requires": {
+          "bins": ["python3"],
+          "permissions": {
+            "filesystem": {
+              "read": ["~/.openclaw/session2blog/", "~/.openclaw/agents/", "~/.openclaw/sessions/"],
+              "write": ["~/.openclaw/session2blog/articles/"]
+            },
+            "process": { "execute": ["python3"] }
+          }
+        },
         "install": [],
       },
   }
 ---
 
 # Session2Blog (s2b)
+
+> ⚠️ **本工具会读取并处理您的完整会话历史，并写入本地 Markdown 文件。** 会话可能包含 API Key、Token、私人路径、邮箱等敏感信息。工具会做最佳努力脱敏（非 100% 保证），**运行前请确认会话不含机密**，发布/外发前请人工复核。
 
 把当前或指定的 OpenClaw 会话对话历史，按模板润色成一篇结构化博文，保存为 Markdown 文件到本地。
 
