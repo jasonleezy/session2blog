@@ -6,12 +6,7 @@
 
 你在 OpenClaw 里跟 AI 干完活，输一句 `/s2b`，它就把刚才的对话整理成一篇结构化博文，直接保存为 Markdown 文件。
 
-**零配置**：不需要 API Key，不需要装 PATH，不需要开终端。模型用 OpenClaw 会话自带的，对话读本地的。
-
-> 🔒 **数据流向说明（请看清边界）**
-> - **免费版**：100% 本地处理。对话只在你机器上读取、润色、保存为 Markdown 文件，**不出本机**。
-> - **Pro 版（可选付费升级）**：新增「掘金一键发草稿」功能。开启后，文章内容和你的掘金 Cookie **会发往掘金 API**（https://api.juejin.cn），这是该功能明确的、需你主动配置 Cookie 才会发生的远程调用，并非默认行为。
-> - 本工具绝不会在未经你显式操作的情况下，把任何内容或凭证发送到第三方。
+**零配置**：不需要 API Key，不需要装 PATH，不需要开终端。模型用 OpenClaw 会话自带的，对话读本地的，完全闭环。
 
 ## 适用场景
 
@@ -48,7 +43,9 @@ bash install.sh
 /s2b --platform juejin        # 掘金风格（硬核、代码密集、体系化）
 /s2b --platform csdn          # CSDN 风格（问题导向、步骤化、实用）
 /s2b --platform zhihu         # 知乎风格（观点感、深度、辩证）
-/s2b --platform all           # 一次生成 4 个平台版本（wechat/juejin/csdn/zhihu 各一）
+/s2b --platform all           # 中文: 一次生成 4 个平台版本（wechat/juejin/csdn/zhihu 各一）
+/s2b --lang en --platform devto  # 生成英文 Dev.to 风格博文
+/s2b --lang en --platform all    # 英文: 一次生成 Dev.to/Hashnode/Medium/HN 4 版
 /s2b --list                   # 列出所有可用会话（带序号、Agent、日期）
 ```
 
@@ -74,7 +71,13 @@ bash install.sh
 | `csdn` CSDN | 问题导向、步骤化、搜索友好 | 「OpenClaw 会话导出失败？【已解决】」 |
 | `zhihu` 知乎 | 观点感、深度、辩证、分层论证 | 「如何评价用 AI 把对话变成博客这件事？」 |
 | `none` 通用（默认） | 平衡调性，[模板] 标题结构 | 「[复盘] 从0到1做数字产品的踩坑」 |
-| `all` 全平台 | 一次生成上述 4 个平台版本 | — |
+| `all` 全平台(中文) | 一次生成上述 4 个平台版本 | — |
+| **英文平台** | | |
+| `devto` Dev.to | 实用、友好、代码导向 | "How I cut build time by 60% with X" |
+| `hashnode` Hashnode | 精致、个人品牌向、结构化 | "The Complete Guide to X for Beginners" |
+| `medium` Medium | 叙事、思辨、长文 | "Stop Using X — Here is What I Do Instead" |
+| `hn` Hacker News | 极简、重实质、无营销 | "Show HN: X does Y in 10 lines" |
+| `all` 全平台(英文) | 一次生成 Dev.to/Hashnode/Medium/HN 4 版 | — |
 
 文件命名规则：`YYYY-MM-DD-<模板>-<平台>-<slug>.md`
 
@@ -127,13 +130,55 @@ bash install.sh
 
 ```yaml
 default_template: auto      # auto | tech-review | learning-notes | troubleshooting
-default_platform: none      # none | wechat | juejin | csdn | zhihu | all
+default_platform: none      # none | wechat | juejin | csdn | zhihu | devto | hashnode | medium | hn | generic | all
 language: zh-CN
 author: ""
 articles_dir: ~/.openclaw/session2blog/articles
+
+# === 发布平台 Cookie（Pro 版）===
+# 仅本地保存，不会随 skill 包发出。
+# 获取: 浏览器登录平台 → 开发者工具 → 复制 Cookie 整串
+# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
+# 当前已实现: juejin (发草稿)。微信/CSDN/知乎待后续更新。
+juejin_cookie:
 ```
 
-> 免费版无需任何 Cookie 或 API Key，完全本地闭环。掘金发布所需的 Cookie 配置仅 Pro 版涉及，见下方「Pro 版」段。
+### 怎么填掘金 Cookie（Pro 版发布用）
+
+1. 浏览器（Safari/Chrome）登录 [juejin.cn](https://juejin.cn)
+2. 打开开发者工具（Safari: 设置→高级→勾选"开发"菜单 → 开发→显示 Web 检查器；Chrome: F12）
+3. 到 **Network（网络）** 标签 → 在掘金随便点个动作触发请求 → 点任意 `juejin.cn` 请求 → **Headers → Request Headers** → 找 `Cookie:` 那一行，复制整串
+4. 粘贴进 config：
+   ```bash
+   # 用任意编辑器打开
+   nano ~/.openclaw/session2blog/config.yaml
+   # 改成:  juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
+   ```
+5. 保存。Cookie 有时效（几天到几周），过期重新抓一次即可。
+
+> ⚠️ Cookie 等同账号登录态，请勿分享、勿贴进聊天/代码仓库。本 skill 只在本机读取并仅发往掘金 API。
+
+### 发布用法（两种方式）
+
+**方式 A：两步法（零依赖，推荐）**
+
+```bash
+# 1) 先生成 md（写文由 OpenClaw 会话模型完成，无需本地 ollama）
+/s2b --platform juejin
+# 2) 再发布该 md 到掘金草稿
+bash ~/.openclaw/skills/session2blog/s2b.sh --platform juejin --publish --file <上一步生成的 .md 路径>
+```
+
+**方式 B：一步法（需本地 ollama）**
+
+```bash
+# 脚本自动调本地 ollama qwen3:14b 写文并发布
+/s2b --platform juejin --publish
+```
+
+> 没装 ollama？脚本会提示改用方式 A。方式 A 对任意买家零门槛。
+
+> 发布默认发**草稿**，不会公开；请到掘金后台确认内容后手动发布。
 
 ## 目录结构
 
@@ -146,32 +191,19 @@ session2blog/
 └── gumroad-product-copy.md  # 产品页文案
 
 ~/.openclaw/session2blog/   # 运行时目录（自动创建）
-├── config.yaml        # 配置文件（权限 600）
+├── config.yaml        # 配置文件（含 juejin_cookie 等，权限 600）
 ├── articles/          # 生成的博文
 └── logs/
 ```
 
 ## 产品信息
 
-- 定价: 免费（MIT 开源）
+- 定价: $5 一次购买，终身更新
+- 许可证: MIT
 - 平台: OpenClaw Skill（需要 OpenClaw 环境）
 
----
+## 生成质量说明
 
-## 🚀 Pro 版（付费，一次性 $5，终身更新）
-
-免费版只生成本地 Markdown + 平台风格适配。**Pro 版额外支持：**
-
-- ✅ **掘金一键发草稿**（需 Pro 版代码）：`/s2b --platform juejin --publish` 直接把文章送进你的掘金草稿箱（默认草稿，您审过后再手动公开）
-- ✅ 两种模式：本地模型写文后发 / 先生成 .md 再发
-- ✅ 优先支持
-
-**获取 Pro：** https://jasonlizy.gumroad.com/l/session2blog-pro
-
-> 路线图（已购用户免费更新）：微信公众号 / CSDN / 知乎发布、定时推送。
-
-## 💬 支持 / 反馈
-
-- **买了 Pro 有问题**：回复你的 Gumroad 收据邮件，或开 GitHub Issue（**请勿公开粘贴 Cookie / 账号凭证**）
-- **功能建议 / Bug**：[GitHub Issues](https://github.com/jasonleezy/session2blog/issues)
-- **免费版问题**：同上，欢迎提 Issue
+- **博文生成质量与您使用的大模型直接相关。** 本工具负责把对话整理成结构化的平台风格草稿，但文风、准确性、深度取决于实际写文的模型（OpenClaw 会话模型或本地 ollama）。
+- **建议人工复核后再发布。** 尤其是技术细节、代码片段、数据准确性，以及自动脱敏是否遗漏了敏感信息。
+- 工具已内置「去 AI 味·仿人写作」指令，但不同模型遵循程度不一，最终可读性以人工检查为准。

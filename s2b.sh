@@ -19,16 +19,21 @@ SESSION_ID=""
 TEMPLATE="auto"
 PLATFORM="none"
 MODE="generate"
+PUBLISH="false"
+PUBLISH_FILE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --session) SESSION_ID="${2:-}"; shift 2 ;;
     --template) TEMPLATE="${2:-auto}"; shift 2 ;;
     --platform) PLATFORM="${2:-none}"; shift 2 ;;
+    --lang) LANG_MODE="${2:-zh}"; shift 2 ;;
+    --publish) PUBLISH="true"; shift ;;
+    --file) PUBLISH_FILE="${2:-}"; shift 2 ;;
     --list) MODE="list"; shift ;;
     -n) SESSION_NUM="${2:-}"; shift 2 ;;
     -h|--help)
-      echo "Usage: s2b [--list] [--session <id>] [--template auto|tech-review|learning-notes|troubleshooting] [--platform wechat|juejin|csdn|zhihu|none|all]"
+      echo "Usage: s2b [--list] [--session <id>] [--template auto|tech-review|learning-notes|troubleshooting] [--platform wechat|juejin|csdn|zhihu|devto|hashnode|medium|hn|generic|none|all] [--lang zh|en] [--publish] [--file <md-path>]"
       exit 0 ;;
     *) echo "未知参数: $1"; echo "用 s2b --help 查看用法"; exit 1 ;;
   esac
@@ -43,6 +48,9 @@ export S2B_PLATFORM="$PLATFORM"
 export S2B_SESSION_DIR="$SESSION_DIR"
 export S2B_ARTICLES_DIR="$ARTICLES_DIR"
 export S2B_CONFIG_FILE="$CONFIG_FILE"
+export S2B_PUBLISH="$PUBLISH"
+export S2B_LANG="${LANG_MODE:-zh}"
+export S2B_PUBLISH_FILE="$PUBLISH_FILE"
 
 python3 <<'PYEOF'
 import os, glob, json, sys
@@ -51,6 +59,14 @@ session_dir = os.environ["S2B_SESSION_DIR"]
 articles_dir = os.environ["S2B_ARTICLES_DIR"]
 mode = os.environ.get("S2B_MODE", "generate")
 session_id = os.environ.get("S2B_SESSION_ID", "")
+_raw_lang = os.environ.get("S2B_LANG", "").strip()
+if _raw_lang in ("zh", "en"):
+    lang_mode = _raw_lang
+else:
+    _cn = sum(1 for c in dialogue_text if "一" <= c <= "鿿")
+    _en = sum(1 for c in dialogue_text if c.isascii() and c.isalpha())
+    lang_mode = "zh" if _cn >= _en else "en"
+LANG_NAME = {"zh": "中文", "en": "English"}.get(lang_mode, "中文")
 template_type = os.environ.get("S2B_TEMPLATE", "auto")
 platform_type = os.environ.get("S2B_PLATFORM", "none")
 
@@ -130,6 +146,89 @@ def extract_dialogue(path):
                 dialogue.append(f"{prefix}{text}")
     return dialogue
 
+def read_config_cookie(platform):
+    """从本地 config.yaml 读取指定平台的 cookie（不打印、不泄露）
+    兼容同行格式 `key: val` 与块格式 `key:\n  val`
+    """
+    cfg = os.environ.get("S2B_CONFIG_FILE", "")
+    if not cfg or not os.path.isfile(cfg):
+        return ""
+    key = f"{platform}_cookie:"
+    with open(cfg) as fh:
+        lines = fh.readlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith(key):
+            # 同行格式: key: val
+            rest = line.split(":", 1)[1].strip() if ":" in line else ""
+            if rest and not rest.startswith("#"):
+                return rest.strip('"').strip("'")
+            # 块格式: 取下一行非空、非注释内容
+            for j in range(i + 1, min(i + 3, len(lines))):
+                nxt = lines[j].strip()
+                if nxt and not nxt.startswith("#"):
+                    return nxt.strip('"').strip("'")
+    return ""
+
+def gen_article_via_ollama(dialogue_text, instruction_text):
+    """用本地 ollama qwen3 把对话+写作指令润色成 Markdown 博文"""
+    import subprocess
+    prompt = (
+        "你是一个技术博主。根据以下『对话内容』和『写作指令』，"
+        "直接输出一篇完整的 Markdown 博文，不要任何解释前缀，不要出现【AI生成】标签。\n\n"
+        "=== 对话内容 ===\n" + dialogue_text + "\n\n=== 写作指令 ===\n" + instruction_text
+    )
+    try:
+        out = subprocess.run(
+            ["ollama", "run", "qwen3:14b", prompt],
+            capture_output=True, text=True, timeout=300,
+        )
+        if out.returncode != 0:
+            return ""
+        # qwen3 可能带 <think> 块，去掉
+        txt = out.stdout
+        import re
+        txt = re.sub(r"<think>.*?</think>", "", txt, flags=re.DOTALL).strip()
+        return txt
+    except Exception:
+        return ""
+
+def publish_juejin_draft(title, markdown_body, cookie):
+    """把 Markdown 作为草稿发布到掘金（默认草稿，不直接公开）
+    流程: 先 article_draft/save 创建草稿，返回 draft_id/article_id
+    """
+    import urllib.request, urllib.error, json as _json
+    base = "https://api.juejin.cn"
+    save_url = base + "/content_api/v1/article_draft/create"
+    payload = _json.dumps({
+        "title": title,
+        "mark_content": markdown_body,
+        "brief_content": (markdown_body[:100] if len(markdown_body) > 100 else markdown_body),
+        "edit_type": 10,
+    }).encode("utf-8")
+    req = urllib.request.Request(save_url, data=payload, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Cookie", cookie)
+    req.add_header("origin", "https://juejin.cn")
+    req.add_header("referer", "https://juejin.cn/editor")
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            data = resp.read().decode("utf-8")
+            return True, data
+    except urllib.error.HTTPError as e:
+        return False, f"HTTP {e.code}: {e.read().decode('utf-8', 'ignore')[:300]}"
+    except Exception as e:
+        return False, str(e)[:300]
+
+
+# 找所有会话文件（排除 trajectory 等辅助文件）
+all_files = glob.glob(os.path.join(session_dir, "*.jsonl"))
+files = sorted(
+    [f for f in all_files if ".trajectory" not in os.path.basename(f)],
+    key=os.path.getmtime,
+    reverse=True,
+)
+
+# 从路径推导 agent 名（父目录的父目录是 agents/<agentId>）
 def agent_of(path):
     p = os.path.dirname(path)
     return os.path.basename(os.path.dirname(p))
@@ -244,14 +343,25 @@ templates = {
 tmpl = templates.get(template_type, templates["tech-review"])
 
 platform_styles = {
-    "wechat": "微信公众号 — 故事感、情绪、代入感。标题用痛点/悬念/数字(例:『我踩了3个坑，终于搞懂了XX』)；开头场景代入；正文口语化像朋友聊天；结尾金句+引导关注；减少代码密度",
-    "juejin": "掘金 — 硬核、体系化、代码密集。标题直给技术关键词(例:『万字长文讲透XX』)；开头前置摘要；正文分节带小标题、代码块密集、步骤可复现；结尾技术总结",
-    "csdn": "CSDN — 实用主义、问题导向、步骤化。标题问题+解决方案(例:『XX报错怎么办？【已解决】』)；开头直接说现象；正文步骤1/2/3+完整代码+注意事项；搜索友好",
-    "zhihu": "知乎 — 观点感、深度、辩证。标题问答/观点句式(例:『如何评价XX？』)；开头先亮核心观点；正文分层论证+案例+辩证；结尾收敛结论+开放讨论",
-    "none": "通用风格 — 平衡调性，标题用 [模板类型] <核心问题> 结构，代码适量，专业但不堆砌",
-    "all": "全平台 — 生成 wechat/juejin/csdn/zhihu 四个版本，各按对应风格输出",
+    "zh": {
+        "wechat": "微信公众号 — 故事感、情绪、代入感。标题用痛点/悬念/数字(例:『我踩了3个坑，终于搞懂了XX』)；开头场景代入；正文口语化像朋友聊天；结尾金句+引导关注；减少代码密度",
+        "juejin": "掘金 — 硬核、体系化、代码密集。标题直给技术关键词(例:『万字长文讲透XX』)；开头前置摘要；正文分节带小标题、代码块密集、步骤可复现；结尾技术总结",
+        "csdn": "CSDN — 实用主义、问题导向、步骤化。标题问题+解决方案(例:『XX报错怎么办？【已解决】』)；开头直接说现象；正文步骤1/2/3+完整代码+注意事项；搜索友好",
+        "zhihu": "知乎 — 观点感、深度、辩证。标题问答/观点句式(例:『如何评价XX？』)；开头先亮核心观点；正文分层论证+案例+辩证；结尾收敛结论+开放讨论",
+        "none": "通用中文风格 — 平衡调性，标题用 [模板类型] <核心问题> 结构，代码适量，专业但不堆砌",
+        "all": "全平台(中文) — 生成 wechat/juejin/csdn/zhihu 四个版本，各按对应风格输出",
+    },
+    "en": {
+        "devto": "Dev.to — practical, friendly, code-forward. Title states the outcome (e.g. 'How I cut build time by 60% with X'). Open with the problem; body uses short sections, runnable code, and a 'what you learned' close. Tone: peer-to-peer, no hype.",
+        "hashnode": "Hashnode — polished, personal-brand friendly. Title poses a clear reader benefit (e.g. 'The Complete Guide to X for Beginners'). Strong intro hook, structured sections with subheads, code where it earns its place, end with a takeaway or discussion question.",
+        "medium": "Medium — narrative, thoughtful, longer-form. Title is a clear promise or soft contrarian take (e.g. 'Stop Using X — Here is What I Do Instead'). Lead with a relatable opener, develop an argument with examples, close with a reflective summary. Code secondary to the story.",
+        "hn": "Hacker News style — terse, substance-first, no marketing. Title is a plain factual claim or question (e.g. 'Show HN: X does Y in 10 lines'). Body is dense and direct: what it is, why it matters, tradeoffs, no fluff.",
+        "generic": "General English — balanced tone, title as '[Type] <core problem>', moderate code, professional but not jargon-heavy.",
+        "none": "General English — balanced tone, title as '[Type] <core problem>', moderate code, professional but not jargon-heavy.",
+        "all": "All English platforms — generate devto/hashnode/medium/hn four versions, each in its own style.",
+    },
 }
-platform_label = platform_styles.get(platform_type, platform_styles["none"])
+platform_label = platform_styles.get(lang_mode, platform_styles["zh"]).get(platform_type, platform_styles[lang_mode]["none"])
 
 dialogue_text = "\n".join(dialogue)
 
@@ -259,19 +369,28 @@ dialogue_text = "\n".join(dialogue)
 instruction_lines = []
 instruction_lines.append(f"模板: {tmpl['name']}")
 instruction_lines.append(f"标题格式: {tmpl['title_fmt']}")
+instruction_lines.append(f"语言: {LANG_NAME}（请用{LANG_NAME}撰写全文，包括标题与正文）")
 instruction_lines.append(f"平台风格: {platform_label}")
+instruction_lines.append("")
+instruction_lines.append("【去AI味·仿人写作要求】生成内容必须尽量像真人写的技术博文，禁止AI八股：")
+instruction_lines.append("  - 用第一人称（我/我们），带个人判断、犹豫、踩坑时的真实情绪，不要全知视角")
+instruction_lines.append("  - 允许口语化表达、轻微啰嗦、个人偏好（'我个人更倾向…'），不要句句工整对仗")
+instruction_lines.append("  - 禁止教科书式 1/2/3 罗列堆砌；段落间允许跳跃，像边想边写")
+instruction_lines.append("  - 禁止空话套话（'在当今时代''综上所述''值得注意的是'）；用具体细节和真实代码片段代替")
+instruction_lines.append("  - 可以有不完美：承认没搞懂的地方、留个开放问题，比假装全懂更真实")
 instruction_lines.append("")
 instruction_lines.append("请根据上述对话内容，按以下结构写一篇完整的博文(Markdown 格式)：")
 instruction_lines.append("")
 instruction_lines.append(tmpl["structure"])
 instruction_lines.append("")
 if platform_type == "all":
-    instruction_lines.append("⚠️  --platform all：请生成 4 个文件，分别对应以下平台风格：")
-    for p in ["wechat", "juejin", "csdn", "zhihu"]:
-        instruction_lines.append(f"   - {p}: {platform_styles[p]}")
-    instruction_lines.append(f"文件名: {session_date}-{template_type}-<平台>-<简短英文标题>.md")
+    all_list = ["wechat", "juejin", "csdn", "zhihu"] if lang_mode == "zh" else ["devto", "hashnode", "medium", "hn"]
+    instruction_lines.append(f"⚠️  --platform all ({LANG_NAME})：请生成 {len(all_list)} 个文件，分别对应以下平台风格：")
+    for p in all_list:
+        instruction_lines.append(f"   - {p}: {platform_styles[lang_mode][p]}")
+    instruction_lines.append(f"文件名: {session_date}-{template_type}-<平台>-<简短{'英文' if lang_mode=='en' else '拼音'}标题>.md")
 else:
-    instruction_lines.append(f"文件名: {session_date}-{template_type}-{platform_type}-<简短英文标题>.md")
+    instruction_lines.append(f"文件名: {session_date}-{template_type}-{platform_type}-<简短{'英文' if lang_mode=='en' else '拼音'}标题>.md")
 instruction_lines.append(f"保存路径: {articles_dir}/")
 instruction_lines.append("")
 instruction_lines.append("要求:")
@@ -284,8 +403,74 @@ instruction_lines.append("  - 敏感信息保护: 禁止出现 API Key/Token/真
 instruction_text = "\n".join(instruction_lines)
 
 # === 发布模式 ===
+if os.environ.get("S2B_PUBLISH", "false") == "true":
+    do_publish = True
+    pub_platform = platform_type if platform_type in ("wechat", "juejin", "csdn", "zhihu") else "juejin"
+    if pub_platform != "juejin":
+        print(f"[提示] 目前仅支持掘金(juejin)自动发布，已切换到 juejin")
+        pub_platform = "juejin"
+
+    # 获取要发布的 markdown 内容
+    md_content = ""
+    pub_file = os.environ.get("S2B_PUBLISH_FILE", "")
+    if pub_file and os.path.isfile(pub_file):
+        with open(pub_file) as fh:
+            md_content = fh.read()
+        print(f"[发布] 读取本地文件: {pub_file}")
+    else:
+        # 一键发布模式: 写文由会话模型(助手)完成, 脚本只负责读 md+发布。
+        # 若直接走到这里(无 --file 且非 skill 自动流程), 提示用 --file 两步法。
+        print("[提示] --publish 需要已生成的 md 文件。")
+        print("        一键用法(由助手自动写文):  /s2b --platform juejin --publish")
+        print("        手动两步法: 先生成 md, 再 s2b.sh --platform juejin --publish --file <md路径>")
+        sys.exit(1)
+        if not md_content:
+            print("[错误] ollama 写文失败（可能未启动 ollama 或服务不可用）")
+            print("        可改用两步法: 先 `/s2b --platform juejin` 生成 md，再 `s2b --publish juejin --file <路径>`")
+            sys.exit(1)
+        # 备份一份到 articles
+        backup_path = os.path.join(articles_dir, f"{session_date}-{template_type}-juejin-auto.md")
+        with open(backup_path, "w") as fh:
+            fh.write(md_content)
+        print(f"[发布] 已生成博文备份: {backup_path}")
+
+    # 从 markdown 提取一级标题作为文章标题
+    import re as _re
+    m = _re.search(r"^#\s+(.+)$", md_content, _re.MULTILINE)
+    art_title = m.group(1).strip() if m else f"{tmpl['name']} {session_date}"
+
+    cookie = read_config_cookie(pub_platform)
+    if not cookie:
+        print(f"[错误] 未在 config 找到 {pub_platform}_cookie，请先写入 ~/.openclaw/session2blog/config.yaml")
+        sys.exit(1)
+
+    print(f"[发布] 正在发布到掘金草稿: 《{art_title}》")
+    ok, resp = publish_juejin_draft(art_title, md_content, cookie)
+    if ok:
+        print("[成功] 已发布为掘金草稿（草稿不会公开，请到掘金后台确认后手动发布）")
+        print(f"        响应: {resp[:200]}")
+    else:
+        print(f"[失败] 掘金发布出错: {resp}")
+    print_pro_pitch()
+    sys.exit(0)
+
+# === Pro 版引导（免费版跑完必弹，提升转化） ===
+def print_pro_pitch():
+    print("")
+    print("  " + "=" * 56)
+    print("  💡 生成完了，但还得手动复制去各平台发？")
+    print("  Pro 版帮你把这一步也省了：")
+    print("")
+    print("  ✅ 一键发布 → 微信 / 掘金 / CSDN / 知乎（不用复制粘贴）")
+    print("  ✅ 定时自动推送 → 配好 cron，每天自动把对话变博文")
+    print("  ✅ 一次买断 $5，终身更新")
+    print("")
+    print("  👉 升级 Pro：https://jasonlizy.gumroad.com/l/session2blog-pro")
+    print("  👉 免费版开源：https://github.com/jasonleezy/session2blog")
+    print("  " + "=" * 56)
 
 # === 非发布模式：打印写作指令（原行为） ===
+print_pro_pitch()
 print("")
 print("╔══════════════════════════════════════════════════════════════╗")
 print("║              Session2Blog — 博文生成器                      ║")

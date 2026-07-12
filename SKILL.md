@@ -1,32 +1,18 @@
 ---
 name: session2blog
-description: "把 OpenClaw 会话历史（含列出/选择历史会话、提取对话、自动脱敏）按模板润色成博文，保存为本地 Markdown 文件。在会话中输入 /s2b 即可触发。免费版完全本地运行，不发起任何网络请求、不处理任何平台 Cookie。"
+description: "把 OpenClaw 会话历史一键润色成博文（技术复盘/学习笔记/排障记录），自动保存为 Markdown 文件。在会话中输入 /s2b 即可触发。"
 metadata:
   {
     "openclaw":
       {
         "emoji": "📝",
-        "requires":
-          {
-            "bins": ["python3"],
-            "permissions":
-              [
-                "filesystem:read ~/.openclaw/sessions/**",
-                "filesystem:write ~/.openclaw/session2blog/articles/**",
-                "session:list",
-                "session:read",
-              ],
-          },
+        "requires": { "bins": ["python3"] },
         "install": [],
       },
   }
 ---
 
 # Session2Blog (s2b)
-
-> **权限与数据边界（免费版）**：本 skill 仅做本地读写——读取 OpenClaw 会话文件、在本地 `~/.openclaw/session2blog/articles/` 写出 Markdown、列出/选择会话。
-> **不**发起任何网络请求，**不**读取或要求任何平台 Cookie（掘金发布等远程能力仅 Pro 版提供，且需用户主动配置 Cookie 才会发生）。
-> 生成内容默认经最佳努力脱敏（API Key / JWT / 路径），发布前请人工复核。
 
 把当前或指定的 OpenClaw 会话对话历史，按模板润色成一篇结构化博文，保存为 Markdown 文件到本地。
 
@@ -45,17 +31,32 @@ metadata:
 /s2b -n 3                     # 处理列表里第 3 个会话
 /s2b --session <id>           # 用完整 session ID 指定
 /s2b --template tech-review   # 指定模板：tech-review | learning-notes | troubleshooting | auto(默认)
-/s2b --platform wechat        # 指定平台风格：wechat | juejin | csdn | zhihu | none(默认) | all(全平台各一版)
-/s2b --platform all --template tech-review   # 一次生成微信公众号+掘金+CSDN+知乎 4 个版本
+/s2b --platform wechat        # 指定平台风格：中文 wechat|juejin|csdn|zhihu；英文 devto|hashnode|medium|hn|generic；none(默认) | all(按语言出全平台各一版)
+/s2b --lang en --platform devto  # 生成英文 Dev.to 风格博文
+/s2b --platform all --template tech-review             # 中文: 一次生成微信+掘金+CSDN+知乎 4 版
+/s2b --lang en --platform all --template tech-review    # 英文: 一次生成 Dev.to+Hashnode+Medium+HN 4 版
+s2b --platform juejin --publish                 # 一键生成并发布到掘金草稿(写文由助手完成, 零本地依赖)
+s2b --platform juejin --publish --file <md>     # 已有 md, 只发布(两步法)
 ```
 
-## 工作流程
+## 发布（一键流程，Pro 版）
 
-当用户触发时，按以下步骤执行：
+当用户带 `--publish` 触发时，**写文这一步由助手（会话模型）直接完成，不依赖本地 ollama 或任何外部 LLM**。流程：
 
-### Step 1: 调用内部脚本提取对话
+1. 助手提取目标会话对话（按 Step 1 调 `s2b.sh` 不带 `--publish`，拿到对话文本）
+2. 助手按 `--platform` 风格**自己写出完整 Markdown 博文**，用 `write` 落盘到 `~/openclaw/session2blog/articles/`（文件名规则见 Step 2）
+3. 助手立即调用发布脚本，**把刚写的 md 传进去**：
+   ```bash
+   bash <skill_dir>/s2b.sh --platform juejin --publish --file <刚写的 md 路径>
+   ```
+4. 脚本只负责读 md + 发掘金草稿（已验证）。发布默认是草稿，不公开。
 
-运行附带脚本 `s2b.sh` 提取对话文本并打印到会话中：
+> 这样 `/s2b --platform juejin --publish` 对买家是**真·一键**：无需 ollama、无需 API key，助手写+发全自动。
+> 若买家本机有 ollama 且想用脚本自动写文，也可用两步法手动 `--file`；但 skill 默认走助手写文路径。
+
+**平台风格适配（关键）：**
+
+生成博文时，必须根据用户指定的 `--platform` 参数套用对应平台的爆款文风格。
 
 ```bash
 bash <skill_dir>/s2b.sh --list          # 先列出可用会话（带序号）
@@ -72,12 +73,13 @@ bash <skill_dir>/s2b.sh -n <N> --template <T>   # 提取指定会话对话
 
 根据脚本输出的对话文本和模板结构，写一篇完整的博文（Markdown 格式）。
 
-**平台风格适配（关键）：**
-
 生成博文时，必须根据用户指定的 `--platform` 参数套用对应平台的爆款文风格。
 不同平台的读者预期、标题习惯、正文结构差异很大，不能只改个标题就完事。
 
-`--platform` 可选值：`wechat`(微信公众号) | `juejin`(掘金) | `csdn`(CSDN) | `zhihu`(知乎) | `none`(默认，通用风格)
+`--platform` 可选值（中文）：`wechat`(微信公众号) | `juejin`(掘金) | `csdn`(CSDN) | `zhihu`(知乎)
+`--platform` 可选值（英文）：`devto` | `hashnode` | `medium` | `hn`(Hacker News 风格) | `generic`(通用英文)
+通用：`none`(默认，通用风格) | `all`(按 `--lang` 出对应语言的全平台版本)
+`--lang` 可选值：`zh`(中文，默认) | `en`(English)
 
 #### 各平台爆款文风格定义
 
@@ -103,6 +105,12 @@ bash <skill_dir>/s2b.sh -n <N> --template <T>   # 提取指定会话对话
 - **特征**：搜索友好，解决具体问题，不要铺垫
 
 **知乎 (zhihu)** — 观点感、深度、辩证
+
+**英文平台风格（需 `--lang en`）**：
+- **Dev.to (devto)** — 实用、友好、代码导向；标题直给结果，正文短章节+可运行代码，结尾「你学到了什么」
+- **Hashnode (hashnode)** — 精致、个人品牌向；标题抛读者收益，强开头钩子，结构化小标题，结尾给 takeaway
+- **Medium (medium)** — 叙事、思辨、长文；标题是承诺或温和反共识，靠例子推进论点，代码服务于故事
+- **Hacker News (hn)** — 极简、重实质、无营销；标题是事实陈述或问句，正文密集直接，讲清是什么/为什么/权衡
 - **标题**：问答/观点句式。例：「如何评价XX？」「做XX是一种什么体验？」
 - **开头**：先亮核心观点（我的看法是…）
 - **正文**：分层论证，引案例/数据/他人观点，承认局限性，辩证看待
@@ -158,7 +166,7 @@ YYYY-MM-DD-<模板名>-<平台>-<简短英文slug>.md
 
 例如：`2026-07-11-tech-review-wechat-session2blog-pivot.md`
 
-同时支持一次生成多平台版本：若用户指定 `--platform all`，则生成 4 个文件（wechat/juejin/csdn/zhihu 各一），共用同一对话内容但风格不同。
+同时支持一次生成多平台版本：若用户指定 `--platform all`，则按 `--lang` 生成对应语言的全平台文件（中文: wechat/juejin/csdn/zhihu；英文: devto/hashnode/medium/hn），共用同一对话内容但风格不同。
 
 用 `write` 工具直接写出文件，并在会话里告知用户文件路径。
 
@@ -180,6 +188,10 @@ juejin_cookie:
 ```
 
 > ⚠️ Cookie 等同登录态，勿分享、勿入仓库。本 skill 只在本机读取并仅发往对应平台 API。
+>
+> **发布两种用法**：
+> - **两步法（零依赖，推荐）**：`/s2b --platform juejin` 由会话模型生成 md → `s2b.sh --platform juejin --publish --file <md路径>` 发布。无需本地 ollama。
+> - **一步法（需本地 ollama）**：`/s2b --platform juejin --publish` 脚本自动调本地 `ollama qwen3:14b` 写文并发布。未装 ollama 时脚本会提示改用两步法。
 
 ## 文件结构
 
@@ -195,7 +207,8 @@ session2blog/
 ## 依赖
 
 - `python3`（macOS 自带）
-- 不需要 API Key —— 直接使用 OpenClaw 会话自带的模型
+- 生成博文：默认使用 OpenClaw 会话自带模型（零额外依赖）；脚本也支持调用本地 `ollama qwen3:14b` 做一步法自动写文（可选，未安装则走两步法）
+- 发布（Pro）：本机 `python3` + 对应平台 Cookie；无任何外部 API Key 依赖
 
 ## 升级到 Pro 版（一键发布 + 定时推送）
 
@@ -209,3 +222,9 @@ session2blog/
 👉 开源免费版（GitHub）：https://github.com/jasonleezy/session2blog
 
 （Pro 版包含本免费版的全部功能，并额外支持多平台直接发布。）
+
+## 生成质量说明
+
+- **博文生成质量与您使用的大模型直接相关。** 工具只负责按平台风格整理结构，文风与准确性由实际写文模型决定。
+- **发布前请人工复核：** 技术细节、代码、数据，以及脱敏是否彻底。
+- 已内置「去 AI 味·仿人写作」要求，但模型遵循程度不一，以人工检查为准。

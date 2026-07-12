@@ -32,7 +32,13 @@ default_platform: none      # none | wechat | juejin | csdn | zhihu | all
 language: zh-CN
 author: ""
 articles_dir: ~/.openclaw/session2blog/articles
-# 免费版无需 Cookie。掘金发布等远程能力见 Pro 版（Gumroad $5）。
+
+# === 发布平台 Cookie（Pro 版功能）===
+# 仅本地保存, 权限 600, 不会随 skill 包发出。
+# 获取方式: 浏览器登录对应平台 → 开发者工具 → Network/Storage 复制 Cookie 整串
+# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
+# 当前已实现: juejin (发草稿)。微信/CSDN/知乎待后续更新。
+juejin_cookie:
 EOF
   chmod 600 "$S2B_DIR/config.yaml"
 fi
