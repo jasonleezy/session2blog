@@ -138,50 +138,7 @@ language: zh-CN
 author: ""
 articles_dir: ~/.openclaw/session2blog/articles
 
-# === 发布平台 Cookie（Pro 版）===
-# 仅本地保存，不会随 skill 包发出。
-# 获取: 浏览器登录平台 → 开发者工具 → 复制 Cookie 整串
-# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
-# 当前已实现: juejin (发草稿)。微信/CSDN/知乎待后续更新。
-juejin_cookie:
-```
-
-### 怎么填掘金 Cookie（Pro 版发布用）
-
-1. 浏览器（Safari/Chrome）登录 [juejin.cn](https://juejin.cn)
-2. 打开开发者工具（Safari: 设置→高级→勾选"开发"菜单 → 开发→显示 Web 检查器；Chrome: F12）
-3. 到 **Network（网络）** 标签 → 在掘金随便点个动作触发请求 → 点任意 `juejin.cn` 请求 → **Headers → Request Headers** → 找 `Cookie:` 那一行，复制整串
-4. 粘贴进 config：
-   ```bash
-   # 用任意编辑器打开
-   nano ~/.openclaw/session2blog/config.yaml
-   # 改成:  juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
-   ```
-5. 保存。Cookie 有时效（几天到几周），过期重新抓一次即可。
-
-> ⚠️ Cookie 等同账号登录态，请勿分享、勿贴进聊天/代码仓库。本 skill 只在本机读取并仅发往掘金 API。
-
-### 发布用法（两种方式）
-
-**方式 A：两步法（零依赖，推荐）**
-
-```bash
-# 1) 先生成 md（写文由 OpenClaw 会话模型完成，无需本地 ollama）
-/s2b --platform juejin
-# 2) 再发布该 md 到掘金草稿
-bash ~/.openclaw/skills/session2blog/s2b.sh --platform juejin --publish --file <上一步生成的 .md 路径>
-```
-
-**方式 B：一步法（需本地 ollama）**
-
-```bash
-# 脚本自动调本地 ollama qwen3:14b 写文并发布
-/s2b --platform juejin --publish
-```
-
-> 没装 ollama？脚本会提示改用方式 A。方式 A 对任意买家零门槛。
-
-> 发布默认发**草稿**，不会公开；请到掘金后台确认内容后手动发布。
+> 📌 **发布为 Pro 版功能**：免费版仅生成本地 Markdown。一键发布（掘金/微信/CSDN/知乎）的配置与用法见文末「升级到 Pro 版」及 Pro 版文档。
 
 ## 目录结构
 
@@ -194,7 +151,7 @@ session2blog/
 └── gumroad-product-copy.md  # 产品页文案
 
 ~/.openclaw/session2blog/   # 运行时目录（自动创建）
-├── config.yaml        # 配置文件（含 juejin_cookie 等，权限 600）
+├── config.yaml        # 本地可选配置（免费版仅需 articles_dir）
 ├── articles/          # 生成的博文
 └── logs/
 ```
@@ -210,3 +167,11 @@ session2blog/
 - **博文生成质量与您使用的大模型直接相关。** 本工具负责把对话整理成结构化的平台风格草稿，但文风、准确性、深度取决于实际写文的模型（OpenClaw 会话模型或本地 ollama）。
 - **建议人工复核后再发布。** 尤其是技术细节、代码片段、数据准确性，以及自动脱敏是否遗漏了敏感信息。
 - 工具已内置「去 AI 味·仿人写作」指令，但不同模型遵循程度不一，最终可读性以人工检查为准。
+
+## 支持这个项目
+
+如果这个工具帮到了你，欢迎到 GitHub 点个 ⭐，让更多人发现：
+
+👉 https://github.com/jasonleezy/session2blog
+
+你的 star 是对开源创作者最好的鼓励。

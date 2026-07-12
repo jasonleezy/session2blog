@@ -1,6 +1,6 @@
 #!/bin/bash
 # Session2Blog — 把 OpenClaw 对话历史一键润色为博文
-# Usage:
+# Usage: 运行 `s2b --help` 查看完整说明
 #   s2b                                   # 处理最新会话，自动选模板
 #   s2b --list                            # 列出可用会话
 #   s2b --session <id>                    # 指定会话
@@ -33,7 +33,39 @@ while [[ $# -gt 0 ]]; do
     --list) MODE="list"; shift ;;
     -n) SESSION_NUM="${2:-}"; shift 2 ;;
     -h|--help)
-      echo "Usage: s2b [--list] [--session <id>] [--template auto|tech-review|learning-notes|troubleshooting] [--platform wechat|juejin|csdn|zhihu|devto|hashnode|medium|hn|generic|none|all] [--lang zh|en] [--publish] [--file <md-path>]"
+      cat <<'EOF'
+Session2Blog (s2b) — 把 OpenClaw 会话历史润色成博文
+
+用法:
+  s2b [选项]
+
+选项:
+  --list                 列出可用会话（id + 日期 + 条数）
+  --session <id>         指定会话 id（默认: 最新会话）
+  -n <num>               指定第 N 个会话（与 --session 二选一）
+  --template <t>         模板: auto(默认) | tech-review | learning-notes | troubleshooting
+  --platform <p>         平台风格（默认 none）:
+                          中文: wechat | juejin | csdn | zhihu
+                          英文: devto | hashnode | medium | hn | generic
+                          all  按 --lang 出对应语言全平台版本
+  --lang <l>             语言: zh(默认, 自动识别对话主要语言) | en
+  --publish              发布到平台（Pro 功能；免费版仅生成本地 md）
+  --file <md-path>       发布已有 md 文件（配合 --publish）
+  -h, --help             显示本帮助
+
+示例:
+  s2b                                     # 处理最新会话, 自动选模板/语言
+  s2b --list                              # 看有哪些会话
+  s2b -n 3 --template tech-review         # 第3个会话, 技术复盘模板
+  s2b --platform juejin                   # 掘金风格(中文)
+  s2b --lang en --platform devto          # 英文 Dev.to 风格
+  s2b --lang en --platform all            # 英文四平台各一版
+  s2b --platform juejin --publish --file x.md   # 发布已有 md(Pro)
+
+说明:
+  - 免费版生成本地 Markdown 到 ~/.openclaw/session2blog/articles/
+  - 一键发布/定时推送为 Pro 版功能
+EOF
       exit 0 ;;
     *) echo "未知参数: $1"; echo "用 s2b --help 查看用法"; exit 1 ;;
   esac

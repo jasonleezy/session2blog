@@ -18,11 +18,11 @@ metadata:
 
 ## Trigger
 
-**仅当用户显式输入以下命令时触发，不匹配普通聊天内容（避免误激活处理会话历史）：**
-- `/s2b`
-- `/session2blog`
+当用户**明确想要把当前/指定会话整理成博文**时触发：
+- 斜杠命令：`/s2b` 或 `/session2blog`
+- 明确的自然语言意图，例如："把这个会话整理成博文""帮我导出成博客""写篇技术复盘/学习笔记/排障记录"
 
-> 注意：不响应任何自然语言表述（如"把刚才的对话整理成博文""帮我写篇复盘""导出成博客"等），必须由用户主动输入斜杠命令才触发，防止误把普通对话写盘。
+> 限定范围：仅在用户意图清晰时触发。**不响应模糊闲聊**（如单说"博客""整理一下"等可能在日常对话里随机命中的表述），避免误把普通会话写盘。
 
 ## 用法
 
@@ -35,24 +35,11 @@ metadata:
 /s2b --lang en --platform devto  # 生成英文 Dev.to 风格博文
 /s2b --platform all --template tech-review             # 中文: 一次生成微信+掘金+CSDN+知乎 4 版
 /s2b --lang en --platform all --template tech-review    # 英文: 一次生成 Dev.to+Hashnode+Medium+HN 4 版
-s2b --platform juejin --publish                 # 一键生成并发布到掘金草稿(写文由助手完成, 零本地依赖)
-s2b --platform juejin --publish --file <md>     # 已有 md, 只发布(两步法)
 ```
 
-## 发布（一键流程，Pro 版）
+## 发布（Pro 版功能）
 
-当用户带 `--publish` 触发时，**写文这一步由助手（会话模型）直接完成，不依赖本地 ollama 或任何外部 LLM**。流程：
-
-1. 助手提取目标会话对话（按 Step 1 调 `s2b.sh` 不带 `--publish`，拿到对话文本）
-2. 助手按 `--platform` 风格**自己写出完整 Markdown 博文**，用 `write` 落盘到 `~/openclaw/session2blog/articles/`（文件名规则见 Step 2）
-3. 助手立即调用发布脚本，**把刚写的 md 传进去**：
-   ```bash
-   bash <skill_dir>/s2b.sh --platform juejin --publish --file <刚写的 md 路径>
-   ```
-4. 脚本只负责读 md + 发掘金草稿（已验证）。发布默认是草稿，不公开。
-
-> 这样 `/s2b --platform juejin --publish` 对买家是**真·一键**：无需 ollama、无需 API key，助手写+发全自动。
-> 若买家本机有 ollama 且想用脚本自动写文，也可用两步法手动 `--file`；但 skill 默认走助手写文路径。
+免费版只生成本地 Markdown 文件，**不发布**到任何平台。一键发布（掘金/微信/CSDN/知乎）为 Pro 版功能，配置与用法见文末「升级到 Pro 版」。
 
 **平台风格适配（关键）：**
 
@@ -181,17 +168,8 @@ author: ""
 default_platform: none      # none | wechat | juejin | csdn | zhihu | all
 articles_dir: ~/.openclaw/session2blog/articles
 
-# 发布平台 Cookie（Pro 版，仅本地，不随包发出）
-# 获取: 浏览器登录平台 → 开发者工具 → 复制 Cookie 整串
-# 例: juejin_cookie: "sessionid=xxx; sid_tt=yyy; ..."
-juejin_cookie:
-```
-
-> ⚠️ Cookie 等同登录态，勿分享、勿入仓库。本 skill 只在本机读取并仅发往对应平台 API。
->
-> **发布两种用法**：
-> - **两步法（零依赖，推荐）**：`/s2b --platform juejin` 由会话模型生成 md → `s2b.sh --platform juejin --publish --file <md路径>` 发布。无需本地 ollama。
-> - **一步法（需本地 ollama）**：`/s2b --platform juejin --publish` 脚本自动调本地 `ollama qwen3:14b` 写文并发布。未装 ollama 时脚本会提示改用两步法。
+# 配置项（本地可选）
+# 免费版仅需 articles_dir；发布相关配置为 Pro 版功能，此处不展开。
 
 ## 文件结构
 
@@ -207,8 +185,7 @@ session2blog/
 ## 依赖
 
 - `python3`（macOS 自带）
-- 生成博文：默认使用 OpenClaw 会话自带模型（零额外依赖）；脚本也支持调用本地 `ollama qwen3:14b` 做一步法自动写文（可选，未安装则走两步法）
-- 发布（Pro）：本机 `python3` + 对应平台 Cookie；无任何外部 API Key 依赖
+- 生成博文：默认使用 OpenClaw 会话自带模型（零额外依赖）；本地 `ollama` 为可选，用于脚本自动写文（未安装则走会话模型写文路径）
 
 ## 升级到 Pro 版（一键发布 + 定时推送）
 
@@ -228,3 +205,11 @@ session2blog/
 - **博文生成质量与您使用的大模型直接相关。** 工具只负责按平台风格整理结构，文风与准确性由实际写文模型决定。
 - **发布前请人工复核：** 技术细节、代码、数据，以及脱敏是否彻底。
 - 已内置「去 AI 味·仿人写作」要求，但模型遵循程度不一，以人工检查为准。
+
+## 支持这个项目
+
+如果免费版帮到了你，欢迎到 GitHub 点个 ⭐：
+
+👉 https://github.com/jasonleezy/session2blog
+
+你的 star 是对开源创作者最好的鼓励。
