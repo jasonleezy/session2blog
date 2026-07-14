@@ -1,5 +1,5 @@
 ## Description: <br>
-Session2Blog turns OpenClaw session history into structured Chinese Markdown blog posts for technical reviews, learning notes, and troubleshooting writeups. <br>
+Session2Blog turns OpenClaw **human×AI collaboration sessions** into structured, decision-traceable Chinese Markdown blog posts for technical reviews, learning notes, and troubleshooting writeups. It distills the real problem-solving process — not soulless AIGC — so every point carries human judgment. <br>
 
 This skill is ready for commercial/non-commercial use. <br>
 
@@ -11,7 +11,7 @@ MIT-0 <br>
 
 
 ## Use Case: <br>
-Developers and OpenClaw users use this skill to convert recent or selected session transcripts into reusable Chinese blog posts, technical retrospectives, learning notes, and troubleshooting records, with optional platform-specific style guidance. <br>
+Developers and OpenClaw users use this skill to convert recent or selected **collaborative session transcripts** — where they worked with AI to solve problems or create — into reusable Chinese blog posts, technical retrospectives, learning notes, and troubleshooting records, with optional platform-specific style guidance. The output reflects real human decision-making, not auto-generated filler. <br>
 
 ### Deployment Geography for Use: <br>
 Global <br>

@@ -26,6 +26,7 @@ while [[ $# -gt 0 ]]; do
     --template) TEMPLATE="${2:-auto}"; shift 2 ;;
     --platform) PLATFORM="${2:-none}"; shift 2 ;;
     --lang) LANG_MODE="${2:-zh}"; shift 2 ;;
+    --with-collab) WITH_COLLAB="1"; shift ;;
     --list) MODE="list"; shift ;;
     -n) SESSION_NUM="${2:-}"; shift 2 ;;
     -h|--help)
@@ -44,6 +45,9 @@ Session2Blog (s2b) — 把 OpenClaw 会话历史润色成博文
                           中文: wechat | juejin | csdn | zhihu
                           英文: devto | hashnode | medium | hn | generic
                           all  按 --lang 出对应语言全平台版本
+  --with-collab          在博文末尾追加「协作过程与关键决策点」区块，
+                        显式呈现真人在协作中的决策与纠错（协作溯源）。
+                        也可在 config.yaml 设 include_collab_trace: true 默认开启。
   --lang <l>             语言: zh(默认, 自动识别对话主要语言) | en
   -h, --help             显示本帮助
 
@@ -54,6 +58,7 @@ Session2Blog (s2b) — 把 OpenClaw 会话历史润色成博文
   s2b --platform juejin                   # 掘金风格(中文)
   s2b --lang en --platform devto          # 英文 Dev.to 风格
   s2b --lang en --platform all            # 英文四平台各一版
+  s2b --with-collab                     # 文末追加协作溯源区块(关键决策点)
 
 说明:
   - 免费版生成本地 Markdown 到 ~/.openclaw/session2blog/articles/
@@ -73,9 +78,23 @@ export S2B_PLATFORM="$PLATFORM"
 export S2B_SESSION_DIR="$SESSION_DIR"
 export S2B_ARTICLES_DIR="$ARTICLES_DIR"
 export S2B_CONFIG_FILE="$CONFIG_FILE"
-export S2B_PUBLISH="$PUBLISH"
+export S2B_PUBLISH="${PUBLISH:-}"
 export S2B_LANG="${LANG_MODE:-zh}"
-export S2B_PUBLISH_FILE="$PUBLISH_FILE"
+export S2B_PUBLISH_FILE="${PUBLISH_FILE:-}"
+# 协作溯源区块：显式 --with-collab 优先；否则读 config.yaml 的 include_collab_trace（默认 false）
+if [ "${WITH_COLLAB:-}" = "1" ]; then
+  export S2B_WITH_COLLAB="1"
+else
+  _cc=""
+  if [ -f "$CONFIG_FILE" ]; then
+    _cc=$(grep -E "^[[:space:]]*include_collab_trace[[:space:]]*:" "$CONFIG_FILE" 2>/dev/null | head -1 | sed -E 's/.*:[[:space:]]*//' | tr -d '"'\'"'")
+  fi
+  if [ "${_cc:-}" = "true" ] || [ "${_cc:-}" = "yes" ] || [ "${_cc:-}" = "1" ]; then
+    export S2B_WITH_COLLAB="1"
+  else
+    export S2B_WITH_COLLAB="0"
+  fi
+fi
 
 python3 <<'PYEOF'
 import os, glob, json, sys
@@ -84,13 +103,15 @@ session_dir = os.environ["S2B_SESSION_DIR"]
 articles_dir = os.environ["S2B_ARTICLES_DIR"]
 mode = os.environ.get("S2B_MODE", "generate")
 session_id = os.environ.get("S2B_SESSION_ID", "")
+# 列出所有会话 jsonl 文件（按修改时间倒序，最新在前）
+files = sorted(glob.glob(os.path.join(session_dir, "*.jsonl")),
+               key=lambda p: os.path.getmtime(p), reverse=True)
 _raw_lang = os.environ.get("S2B_LANG", "").strip()
 if _raw_lang in ("zh", "en"):
     lang_mode = _raw_lang
 else:
-    _cn = sum(1 for c in dialogue_text if "一" <= c <= "鿿")
-    _en = sum(1 for c in dialogue_text if c.isascii() and c.isalpha())
-    lang_mode = "zh" if _cn >= _en else "en"
+    # 未显式指定时，待对话加载后在 GENERATE 模式里再 detect_lang()
+    lang_mode = None
 LANG_NAME = {"zh": "中文", "en": "English"}.get(lang_mode, "中文")
 template_type = os.environ.get("S2B_TEMPLATE", "auto")
 platform_type = os.environ.get("S2B_PLATFORM", "none")
@@ -330,6 +351,12 @@ platform_label = platform_styles.get(lang_mode, platform_styles["zh"]).get(platf
 
 dialogue_text = "\n".join(dialogue)
 
+# 未显式指定语言时，按对话内容自动检测
+if lang_mode is None:
+    lang_mode = detect_lang(dialogue_text)
+LANG_NAME = {"zh": "中文", "en": "English"}.get(lang_mode, "中文")
+
+
 # 构建写作指令文本（供 ollama 写文 / 打印用）
 instruction_lines = []
 instruction_lines.append(f"模板: {tmpl['name']}")
@@ -349,6 +376,22 @@ instruction_lines.append("请根据上述对话内容，按以下结构写一篇
 instruction_lines.append("")
 instruction_lines.append(tmpl["structure"])
 instruction_lines.append("")
+# === 协作溯源区块（--with-collab 或 config include_collab_trace: true 时启用）===
+with_collab = os.environ.get("S2B_WITH_COLLAB", "0").strip() == "1"
+if with_collab:
+    if lang_mode == "en":
+        instruction_lines.append("【Collaboration trace — REQUIRED】After the main body, add a final section titled '## Collaboration & Key Decisions'. It must make the human-in-the-loop visible and verifiable (this is the core differentiator of Session2Blog, not generic AIGC):")
+        instruction_lines.append("  - Extract from the dialogue the moments where the HUMAN made a call, corrected the AI, changed direction, or rejected a suggestion.")
+        instruction_lines.append("  - List 3–6 bullet points. Each: what the decision was + who drove it (e.g. 'Human: pivoted from X to Y after the first approach failed').")
+        instruction_lines.append("  - Keep it factual and tied to the actual conversation; do NOT invent decisions.")
+        instruction_lines.append("  - This section proves the post carries real human judgment — write it as plain provenance, not marketing.")
+    else:
+        instruction_lines.append("【协作溯源区块 — 必加】正文之后，追加最后一节，标题为『## 协作过程与关键决策点』。它必须让『真人在 loop 里』可见、可验证（这是 Session2Blog 区别于普通 AIGC 的核心卖点）：")
+        instruction_lines.append("  - 从对话中提取：真人在哪些节点拍板、纠错、改变方向、或否决了 AI 的建议。")
+        instruction_lines.append("  - 列 3–6 个要点，每条写清：决策是什么 + 谁主导的（如『真人：首方案失败后，从 X 转向 Y』）。")
+        instruction_lines.append("  - 必须基于真实对话，不要编造决策。")
+        instruction_lines.append("  - 这一节是在证明文章承载了真实的人类判断——如实写溯源，不要写成营销话术。")
+    instruction_lines.append("")
 if platform_type == "all":
     all_list = ["wechat", "juejin", "csdn", "zhihu"] if lang_mode == "zh" else ["devto", "hashnode", "medium", "hn"]
     instruction_lines.append(f"⚠️  --platform all ({LANG_NAME})：请生成 {len(all_list)} 个文件，分别对应以下平台风格：")

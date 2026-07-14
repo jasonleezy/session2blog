@@ -1,6 +1,6 @@
 ---
 name: session2blog
-description: "把 OpenClaw 会话历史一键润色成博文（技术复盘/学习笔记/排障记录），自动保存为 Markdown 文件。在会话中输入 /s2b 即可触发。"
+description: "把 OpenClaw 里你与 AI 真实协作解决问题的过程，沉淀成带真人决策链的结构化博文（技术复盘/学习笔记/排障记录），自动保存为 Markdown 文件。在会话中输入 /s2b 即可触发。"
 metadata:
   {
     "openclaw":
@@ -25,7 +25,9 @@ metadata:
 
 > ⚠️ **本工具会读取并处理您的完整会话历史，并写入本地 Markdown 文件。** 会话可能包含 API Key、Token、私人路径、邮箱等敏感信息。工具会做最佳努力脱敏（非 100% 保证），**运行前请确认会话不含机密**，发布/外发前请人工复核。
 
-把当前或指定的 OpenClaw 会话对话历史，按模板润色成一篇结构化博文，保存为 Markdown 文件到本地。
+把当前或指定的 OpenClaw 会话中**你与 AI 协作解决问题、创作、决策的过程**，按模板整理成一篇带真人决策链的结构化博文，保存为 Markdown 文件到本地。
+
+**它不是 AI 替你写文章，而是把你们真实的协作痕迹沉淀成可读的内容**——平台抵制的是无脑 AIGC 注水，而这里的每个观点都来自真人在 loop 里的判断与拍板。
 
 ## Trigger
 
@@ -46,6 +48,7 @@ metadata:
 /s2b --lang en --platform devto  # 生成英文 Dev.to 风格博文
 /s2b --platform all --template tech-review             # 中文: 一次生成微信+掘金+CSDN+知乎 4 版
 /s2b --lang en --platform all --template tech-review    # 英文: 一次生成 Dev.to+Hashnode+Medium+HN 4 版
+/s2b --with-collab            # 文末追加「协作过程与关键决策点」区块(协作溯源, 显式真人决策)
 ```
 
 ## 发布（Pro 版功能）
@@ -178,6 +181,10 @@ language: zh-CN
 author: ""
 default_platform: none      # none | wechat | juejin | csdn | zhihu | all
 articles_dir: ~/.openclaw/session2blog/articles
+
+# 协作溯源：是否在博文末尾追加「协作过程与关键决策点」区块（默认 false 不加）
+# 也可在命令里用 /s2b --with-collab 临时开启，无需改配置
+include_collab_trace: false
 
 # 配置项（本地可选）
 # 免费版仅需 articles_dir；发布相关配置为 Pro 版功能，此处不展开。
